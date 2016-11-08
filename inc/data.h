@@ -125,6 +125,21 @@ const float missileVertices[] = {
   1.0f, 0.0f, 1.0f, // 3
 
   // normals
+   1.0f, 0.0f, invSqrt2,
+   1.0f, 0.0f, invSqrt2,
+   1.0f, 0.0f, invSqrt2,
+
+  -1.0f, 0.0f, invSqrt2,
+  -1.0f, 0.0f, invSqrt2,
+  -1.0f, 0.0f, invSqrt2,
+
+   0.0f, 1.0f, -invSqrt2,
+   0.0f, 1.0f, -invSqrt2,
+   0.0f, 1.0f, -invSqrt2,
+
+   0.0f, -1.0f, -invSqrt2,
+   0.0f, -1.0f, -invSqrt2,
+   0.0f, -1.0f, -invSqrt2,
 };
 
 

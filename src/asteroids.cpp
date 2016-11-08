@@ -13,6 +13,8 @@
 #include "render_stuff.h"
 #include "spline.h"
 
+extern SCommonShaderProgram shaderProgram;
+extern bool useLighting;
 
 typedef std::list<void *> GameObjectsList; 
 
@@ -46,42 +48,40 @@ struct GameObjects {
 
 void increaseSpaceShipSpeed(float deltaSpeed = SPACESHIP_SPEED_INCREMENT) {
 
-// ======== BEGIN OF SOLUTION - TASK 2_2-1 ======== //
-  // increase the space ship speed by deltaSpeed
-  // speed should not exceed the SPACESHIP_SPEED_MAX
-
-  // gameObjects.spaceShip->speed = ...
-
-// ========  END OF SOLUTION - TASK 2_2-1  ======== //
+  gameObjects.spaceShip->speed =
+    std::min(gameObjects.spaceShip->speed + deltaSpeed, SPACESHIP_SPEED_MAX);
 }
 
 void decreaseSpaceShipSpeed(float deltaSpeed = SPACESHIP_SPEED_INCREMENT) {
 
-// ======== BEGIN OF SOLUTION - TASK 2_2-2 ======== //
-  // decrease the space ship speed by deltaSpeed
-  // speed have to be always greater or equal to zero
-
-  // gameObjects.spaceShip->speed = ...
-
-// ========  END OF SOLUTION - TASK 2_2-2  ======== //
+  gameObjects.spaceShip->speed =
+    std::max(gameObjects.spaceShip->speed - deltaSpeed, 0.0f);
 }
 
 void turnSpaceShipLeft(float deltaAngle) {
 
-// ======== BEGIN OF SOLUTION - TASK 2_2-3 ======== //
-  // update space ship view angle by deltaAngle and recalculate its direction
-  // keep always view angle in range <0,360> degrees
+  gameObjects.spaceShip->viewAngle += deltaAngle;
 
-// ========  END OF SOLUTION - TASK 2_2-3  ======== //
+  if(gameObjects.spaceShip->viewAngle > 360.0f)
+    gameObjects.spaceShip->viewAngle -= 360.0f;
+
+  float angle = glm::radians(gameObjects.spaceShip->viewAngle);
+
+  gameObjects.spaceShip->direction.x = cos(angle);
+  gameObjects.spaceShip->direction.y = sin(angle);
 }
 
 void turnSpaceShipRight(float deltaAngle) {
 
-// ======== BEGIN OF SOLUTION - TASK 2_2-4 ======== //
-  // update space ship view angle by deltaAngle and recalculate its direction
-  // keep always view angle in range <0,360> degrees
+  gameObjects.spaceShip->viewAngle -= deltaAngle;
 
-// ========  END OF SOLUTION - TASK 2_2-4  ======== //
+  if(gameObjects.spaceShip->viewAngle < 0.0f)
+    gameObjects.spaceShip->viewAngle += 360.0f;
+
+  float angle = glm::radians(gameObjects.spaceShip->viewAngle);
+
+  gameObjects.spaceShip->direction.x = cos(angle);
+  gameObjects.spaceShip->direction.y = sin(angle);
 }
 
 void teleport(void) {
@@ -270,22 +270,19 @@ void drawWindowContents() {
 
   if(gameState.freeCameraMode == true) {
 
-// ======== BEGIN OF SOLUTION - TASK 2_2-5 ======== //
-    // compute correctly camera position, direction, and up vector using space ship parameters
+    glm::vec3 cameraPosition = gameObjects.spaceShip->position;
+    glm::vec3 cameraUpVector = glm::vec3(0.0f, 0.0f, 1.0f);
+    glm::vec3 cameraCenter;
 
-    glm::vec3 cameraPosition = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 cameraCenter   = glm::vec3(0.0f, 0.0f, 0.0f);
-    glm::vec3 cameraUpVector = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 cameraViewDirection = gameObjects.spaceShip->direction;
 
-// ========  END OF SOLUTION - TASK 2_2-5  ======== //
+    glm::vec3 rotationAxis = glm::cross(cameraViewDirection, glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 cameraTransform = glm::rotate(glm::mat4(1.0f), gameState.cameraElevationAngle, rotationAxis);
 
-// ======== BEGIN OF SOLUTION - TASK 2_3-1 ======== //
-    // update camera view direction (through variable cameraCenter) and cameraUpVector by gameState.cameraElevationAngle variable
+    cameraUpVector = glm::vec3(cameraTransform * glm::vec4(cameraUpVector, 0.0f));
+    cameraViewDirection = glm::vec3(cameraTransform * glm::vec4(cameraViewDirection, 0.0f));
 
-// ========  END OF SOLUTION - TASK 2_3-1  ======== //
-
-// ======== BEGIN OF SOLUTION - TASK 2_2-6 ======== //
-// ========  END OF SOLUTION - TASK 2_2-6  ======== //
+    cameraCenter = cameraPosition + cameraViewDirection;
 
     viewMatrix = glm::lookAt(
       cameraPosition,
@@ -295,6 +292,19 @@ void drawWindowContents() {
 
     projectionMatrix = glm::perspective(60.0f, gameState.windowWidth/(float)gameState.windowHeight, 0.1f, 10.0f);
   }
+
+  glUseProgram(shaderProgram.program);
+  glUniform1f(shaderProgram.timeLocation, gameState.elapsedTime);
+
+// ======== BEGIN OF SOLUTION - TASK 3_3-1 ======== //
+
+  // set correct position and direction of the reflector to the shaders
+  // use reflectorPosition and reflectorDirection uniforms
+
+  // glUniform...
+
+// ========  END OF SOLUTION - TASK 3_3-1  ======== //
+  glUseProgram(0);
 
   // draw space ship
   drawSpaceShip(gameObjects.spaceShip, viewMatrix, projectionMatrix);
@@ -351,12 +361,7 @@ void updateObjects(float elapsedTime) {
   // update space ship 
   float timeDelta = elapsedTime - gameObjects.spaceShip->currentTime;
   gameObjects.spaceShip->currentTime = elapsedTime;
-// ======== BEGIN OF SOLUTION - TASK 2_2-7 ======== //
-  // update space ship position taking into account timeDelta, space ship speed, and space ship direction
-
-  // gameObjects.spaceShip->position += ...;
-
-// ========  END OF SOLUTION - TASK 2_2-7  ======== //
+  gameObjects.spaceShip->position += timeDelta * gameObjects.spaceShip->speed * gameObjects.spaceShip->direction;
 
   // update asteroids
   GameObjectsList::iterator it = gameObjects.asteroids.begin();
@@ -596,6 +601,8 @@ void initializeApplication() {
   glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
   glEnable(GL_DEPTH_TEST);
 
+  useLighting = true;
+
   // initialize shaders
   initializeShaderPrograms();
   // create geometry for all models used
@@ -631,7 +638,7 @@ int main(int argc, char** argv) {
 
   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH | GLUT_STENCIL);
 #else
-  glutInitDisplayMode(GLUT_3_2_CORE_PROFILE | GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH | GLUT_STENCIL);  
+  glutInitDisplayMode(GLUT_3_2_CORE_PROFILE | GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH | GLUT_STENCIL);
 #endif
 
   // initial window size
@@ -655,11 +662,7 @@ int main(int argc, char** argv) {
 
   initializeApplication();
 
-#ifndef __APPLE__
-  glutCloseFunc(finalizeApplication);
-#else
   glutWMCloseFunc(finalizeApplication);
-#endif
 
   glutMainLoop();
 

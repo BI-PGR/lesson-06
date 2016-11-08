@@ -1,86 +1,95 @@
 Task 1 (done with teacher)
 ------
-Explore the source code related to the keyboard callbacks and object transformations.
+* blender export plugin - export of models from blender into C style arrays
+* loader for single mesh geometry -> assimp library -> function loadSingleMesh() in file render_stuff.cpp 
+* quick review of the Phong illumination model
+* normal vectors
+* glsl functions - reflect, normalize, dot, cross, pow, min, max
 
 
-Task 2 [1 point]        >>> TASK 2_2-Y <<<
+Task 2 [1 point]      >>> TASK 3_2-Y <<<
 ----------------
-Implement free camera (camera freely moving within the scene) that will be:
-- moving forward
-- able to turn left and right
-- increase and decrease movement speed  
+description: Implement PHONG illumination model for the DIRECTIONAL LIGHTs (e.g. the Sun). Lighting
+has to be calculated on PER-VERTEX basis in camera space, i.e. lighting is calculated for each vertex
+and the computed color is interpolated across the surface of the graphical primitive to get colors of
+fragments (per vertex lighting).
 
-Camera view is tied to the spaceship, i.e. camera has the same direction and position as spaceship. 
-Camera transformation should be set up by glm::looAt() function whose parameters (center, position,
-  and up vector) have to be derived from the spaceship state structure variables (structure
-  SpaceShipObject declared in render_stuff.h) -> see GameObjects->spaceShip variable
+subtasks:
 
-Camera movement has to be realized through the spaceship movement in the following functions
-  invoked by arrow keys (all in file asteroids.cpp):
+>>> TASK 3_2-1 <<< 
+* append lines into function directionalLight() located in vertex shader lightingPerVertex.vert to:
+  - compute ambient, diffuse, and specular component of the Phong illumination model (see lectures slides
+    for details and equations), sum them together and store the result as a return value to the ret variable
+  - use the Material and Light structures to obtain surface and light properties
+  - the vertexPosition and vertexNormal variables contain transformed surface position and normal
+  - for directional lights, light.position contains the direction
+  - everything is expressed in the view coordinate system -> eye/camera is at the origin
 
-* function increaseSpaceShipSpeed(float deltaSpeed)
-* function decreaseSpaceShipSpeed(float deltaSpeed)
-* turnSpaceShipLeft(float deltaAngle)
-* turnSpaceShipLeft(float deltaAngle)
-
-Append lines to the following functions in file asteroids.cpp to complete the camera/spaceship movement:
-
-* function increaseSpaceShipSpeed(float deltaSpeed)       >>> TASK 2_2-1 <<<
- - increase the space ship speed (variable gameObjects.spaceShip->speed) by deltaSpeed
- - speed should not exceed the SPACESHIP_SPEED_MAX
-
-* function decreaseSpaceShipSpeed(float deltaSpeed)       >>> TASK 2_2-2 <<<
- - decrease the space ship speed by deltaSpeed
- - speed have to be always greater or equal to zero
-
-* turnSpaceShipLeft(float deltaAngle)                     >>> TASK 2_2-3 <<<
- - update space ship view angle (variable gameObjects.spaceShip->viewAngle) by deltaAngle
-   and recalculate its direction (gameObjects.spaceShip->direction)
-   note that gameObjects.spaceShip->direction represents shaceship orientation with respect to its position
- - keep always view angle in range <0,360> degrees
-
-* turnSpaceShipRight(float deltaAngle)                    >>> TASK 2_2-4 <<<
- - update space ship view angle by deltaAngle and recalculate its direction, similarly
-   to turnSpaceShipLeft but in oposite direction
- - keep always view angle in range <0,360> degrees
-
-Append lines to drawWindowContents() function in file asteroids.cpp to:    >>> TASK 2_2-5 a TASK 2_2-6 <<<
-* set camera transformation by glm::looAt() function whose parameters (center, position,
-  and up vector) have to be derived from the spaceship state structure variables (structure
-  SpaceShipObject declared in render_stuff.h) -> see GameObjects.spaceShip variable
-
-Append lines to updateObjects() function in file asteroids.cpp to:    >>> TASK 2_2-7 <<<
-* update space ship position taking into account timeDelta, space ship speed, and space ship direction
+>>> TASK 3_2-2 <<< 
+* change position of the Sun according to the current time to make it rotate in XZ plane
+  in world coordinates (i.e. use goniometric functions -> circle)
+  - append your code into the function setupLights() in vertex shader lightingPerVertex.vert
 
 
-Task 3 [1 point]        >>> TASK 2_3-Y <<<
+Task 3 [1 point]      >>> TASK 3_3-Y <<< 
 ----------------
+decription: Implement Phong illumination model for the SPOTLIGHTs (e.g. the camera headlight). Lighting
+has to be calculated on PER-VERTEX basis.
 
-Extend the previous task to move the view direction of the camera also up and down
-by mouse (have should switch to the free camera mode first).
+subtasks:
 
-Append lines to drawWindowContents() function in file asteroids.cpp to:    >>> TASK 2_3-1 <<<
-* update camera view direction (through variable cameraCenter) and cameraUpVector by gameState.cameraElevationAngle variable
- - gameState.cameraElevationAngle variable is already set up in passiveMouseMotionCallback() according to the mouse movement
- - cameraCenter and cameraUpVector are local variables used as parameters for the glm::lookAt() function
- - the up vector has to be perpendicular to the view direction - note that this is not required by the lookAt function,
-   but you have to ensure it by your own calculation
+* change position and direction of the reflector (spotlight) to be the same as spaceship's position
+  and orientation in world coordinates:
+  - use vertex shader uniforms named spaceShipReflector.position and spaceShipReflector.spotDirection
+  - set correct position and direction of the reflector for the shaders (through mentioned uniforms)
+    => function drawWindowContents() in file asteroids.cpp       >>> TASK 3_3-2 <<< 
+  - append lines to setupLights() function in vertex shader lightingPerVertex.vert to fill in
+    correct position and spotDirection entries in the spaceShipReflector structure according to
+    the values of passed unifoms reflectorPosition and reflectorDirection (keep in mind that 
+    uniforms' values are defined in world space while the lighting evaluation is done in camera
+    space)       >>> TASK 3_3-3 <<< 
+
+>>> TASK 3_3-1 <<<
+* append lines into function spotLight() located in vertex shader lightingPerVertex.vert
+  - for spotlights, light.position contains the light's position within the scene
+  - in comparison to the previous task, now you have to take into account additional
+    light parameters - spotlight direction, spot exponent, and spot cutoff
+
+
+Task 4 - bonus [1 point]
+------------------------
+description: Implement Phong illumination model for the directional lights and spotlights that
+has to be evaluated on PER-PIXEL basis.
+
+subtasks:
+
+* lighting has to be evalueated for each fragment separately in the fragment shader
+  (per fragment lighting)
+* normals have to be converted to the camera space and then passed from vertex shader into
+  fragment shader and interpolated
+* shaders should be stored into lightingPerFragment.vert and lightingPerFragment.frag files
+* equations are the same as in previous task except the evaluation on per-pixel basis (done
+  through normal vector interpolation)
 
 
 Notes:
 ------
-* you can switch between static viewpoint and free camera view by "c" key
-* parts of the source code that should be modified to fullfill the tasks are marked
-  by the following sequence of comments where X indicates task number and Y subtask:
 
-    // ======== BEGIN OF SOLUTION - TASK 2_X-Y ======== //
+* !!! lighting is evaluated in camera coordinates i.e. in camera space !!!
+
+* parts of the source code that should be modified to fullfill the tasks are marked
+  by the following sequence of comments where X indicates the task number and Y the 
+  subtask number:
+
+    // ======== BEGIN OF SOLUTION - TASK 3_X-Y ======== //
     ...
-    // ========  END OF SOLUTION - TASK 2_X-Y  ======== //
+    // ========  END OF SOLUTION - TASK 3_X-Y  ======== //
 
 
 
 What files do you have to edit:
-TASK 2_2:
- -> asteroids.cpp: 49, 60, 71, 80, 273, 287, 354
-TASK 2_3:
- -> asteroids.cpp: 282
+TASK 3_2:
+ -> lightingPerVertex.vert: 78, 103
+TASK 3_3:
+ -> lightingPerVertex.vert: 56, 119
+ -> asteroids.cpp: 299

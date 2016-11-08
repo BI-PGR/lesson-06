@@ -23,11 +23,34 @@ const char* SPACESHIP_MODEL_NAME = "data/ghoul.obj";
 
 SCommonShaderProgram shaderProgram;
 
+bool useLighting = false;
 
 void setTransformUniforms(const glm::mat4 &modelMatrix, const glm::mat4 &viewMatrix, const glm::mat4 &projectionMatrix) {
 
   glm::mat4 PVM = projectionMatrix * viewMatrix * modelMatrix;
   glUniformMatrix4fv(shaderProgram.PVMmatrixLocation, 1, GL_FALSE, glm::value_ptr(PVM));
+
+  glUniformMatrix4fv(shaderProgram.VmatrixLocation, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+  glUniformMatrix4fv(shaderProgram.MmatrixLocation, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+  glm::mat4 normalMatrix = glm::transpose(glm::inverse(modelMatrix));
+  glUniformMatrix4fv(shaderProgram.normalMatrixLocation, 1, GL_FALSE, glm::value_ptr(normalMatrix));  // correct matrix for non-rigid transform
+}
+
+void setMaterialUniforms(const glm::vec3 &ambient, const glm::vec3 &diffuse, const glm::vec3 &specular, float shininess, GLuint texture) {
+  glUniform3fv(shaderProgram.diffuseLocation,  1, glm::value_ptr(diffuse));  // 2nd parameter must be 1 - it declares number of vectors in the vector array
+  glUniform3fv(shaderProgram.ambientLocation,  1, glm::value_ptr(ambient));
+  glUniform3fv(shaderProgram.specularLocation, 1, glm::value_ptr(specular));
+  glUniform1f(shaderProgram.shininessLocation,    shininess);
+
+  if(texture != 0) {
+    glUniform1i(shaderProgram.useTextureLocation, 1);  // do texture sampling
+    glUniform1i(shaderProgram.texSamplerLocation, 0);  // texturing unit 0 -> samplerID   [for the GPU linker]
+    glActiveTexture(GL_TEXTURE0 + 0);                  // texturing unit 0 -> to be bound [for OpenGL BindTexture]
+    glBindTexture(GL_TEXTURE_2D, texture);
+  }
+  else {
+    glUniform1i(shaderProgram.useTextureLocation, 0);  // do not sample the texture
+  }
 }
 
 void drawSpaceShip(SpaceShipObject *spaceShip, const glm::mat4 & viewMatrix, const glm::mat4 & projectionMatrix) {
@@ -40,6 +63,14 @@ void drawSpaceShip(SpaceShipObject *spaceShip, const glm::mat4 & viewMatrix, con
 
   // setting matrices to the vertex & fragment shader
   setTransformUniforms(modelMatrix, viewMatrix, projectionMatrix);
+
+  setMaterialUniforms(
+    spaceShipGeometry->ambient,
+    spaceShipGeometry->diffuse,
+    spaceShipGeometry->specular,
+    spaceShipGeometry->shininess,
+    spaceShipGeometry->texture
+  );
 
   glBindVertexArray(spaceShipGeometry->vertexArrayObject);
   glDrawElements(GL_TRIANGLES, spaceShipGeometry->numTriangles * 3, GL_UNSIGNED_INT, 0);
@@ -61,6 +92,14 @@ void drawAsteroid(AsteroidObject* asteroid, const glm::mat4 & viewMatrix, const 
 
   // setting matrices to the vertex & fragment shader
   setTransformUniforms(modelMatrix, viewMatrix, projectionMatrix);
+
+  setMaterialUniforms(
+    asteroidGeometry->ambient,
+    asteroidGeometry->diffuse,
+    asteroidGeometry->specular,
+    asteroidGeometry->shininess,
+    asteroidGeometry->texture
+  );
 
   glBindVertexArray(asteroidGeometry->vertexArrayObject);
   glDrawElements(GL_TRIANGLES, asteroidGeometry->numTriangles * 3, GL_UNSIGNED_INT, 0);
@@ -87,6 +126,14 @@ void drawMissile(MissileObject* missile, const glm::mat4 & viewMatrix, const glm
   // setting matrices to the vertex & fragment shader
   setTransformUniforms(modelMatrix, viewMatrix, projectionMatrix);
 
+  setMaterialUniforms(
+    missileGeometry->ambient,
+    missileGeometry->diffuse,
+    missileGeometry->specular,
+    missileGeometry->shininess,
+    missileGeometry->texture
+  );
+
   glBindVertexArray(missileGeometry->vertexArrayObject);
   glDrawArrays(GL_TRIANGLES, 0, missileGeometry->numTriangles*3);
 
@@ -107,6 +154,20 @@ void drawUfo(UfoObject* ufo, const glm::mat4 & viewMatrix, const glm::mat4 & pro
   // setting matrices to the vertex & fragment shader
   setTransformUniforms(modelMatrix, viewMatrix, projectionMatrix);
 
+  // angular speed = 2*pi*frequency => path = angular speed * time
+  const float frequency = 0.33f; // per second
+  float angle = 6.28f * frequency * (ufo->currentTime-ufo->startTime); // angle in radians
+  float scaleFactor = 0.5f*(cos(angle) + 1.0f);
+  glm::vec3 yellowMat = glm::vec3(scaleFactor, scaleFactor, 0.0f);
+
+  setMaterialUniforms(
+    yellowMat,
+    yellowMat,
+    yellowMat,
+    ufoGeometry->shininess,
+    ufoGeometry->texture
+  );
+
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   // glEnable(GL_CULL_FACE);
   // glCullFace(GL_FRONT);
@@ -114,12 +175,28 @@ void drawUfo(UfoObject* ufo, const glm::mat4 & viewMatrix, const glm::mat4 & pro
   glDrawArrays(GL_TRIANGLES, 0, 3*ufoGeometry->numTriangles/2);
   CHECK_GL_ERROR();
 
+  setMaterialUniforms(
+    ufoGeometry->ambient*(1.0f-scaleFactor),
+    ufoGeometry->diffuse*(1.0f-scaleFactor),
+    ufoGeometry->specular*(1.0f-scaleFactor),
+    ufoGeometry->shininess,
+    ufoGeometry->texture
+  );
+
   // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   // glEnable(GL_CULL_FACE);
   // glCullFace(GL_BACK);
   glBindVertexArray(ufoGeometry->vertexArrayObject);
   glDrawArrays(GL_TRIANGLES, 3*ufoGeometry->numTriangles/2, 3*ufoGeometry->numTriangles/2);
   CHECK_GL_ERROR();
+
+  setMaterialUniforms(
+    ufoGeometry->ambient,
+    ufoGeometry->diffuse,
+    ufoGeometry->specular,
+    ufoGeometry->shininess,
+    ufoGeometry->texture
+  );
 
   glDrawElements(GL_TRIANGLES, ufoGeometry->numTriangles*3, GL_UNSIGNED_INT, 0);
   // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -141,6 +218,39 @@ void initializeShaderPrograms(void) {
 
   std::vector<GLuint> shaderList;
 
+  if(useLighting == true) {
+    // load and compile shader for lighting (lights & materials)
+
+    // push vertex shader and fragment shader
+    shaderList.push_back(pgr::createShaderFromFile(GL_VERTEX_SHADER, "shd/lightingPerVertex.vert"));
+    shaderList.push_back(pgr::createShaderFromFile(GL_FRAGMENT_SHADER, "shd/lightingPerVertex.frag"));
+
+    // create the program with two shaders
+    shaderProgram.program = pgr::createProgram(shaderList);
+
+    // get vertex attributes locations, if the shader does not have this uniform -> return -1
+    shaderProgram.posLocation      = glGetAttribLocation(shaderProgram.program, "position");
+    shaderProgram.normalLocation   = glGetAttribLocation(shaderProgram.program, "normal");
+    shaderProgram.texCoordLocation = glGetAttribLocation(shaderProgram.program, "texCoord");
+    // get uniforms locations
+    shaderProgram.PVMmatrixLocation    = glGetUniformLocation(shaderProgram.program, "PVMmatrix");
+    shaderProgram.VmatrixLocation      = glGetUniformLocation(shaderProgram.program, "Vmatrix");
+    shaderProgram.MmatrixLocation      = glGetUniformLocation(shaderProgram.program, "Mmatrix");
+    shaderProgram.normalMatrixLocation = glGetUniformLocation(shaderProgram.program, "normalMatrix");
+    shaderProgram.timeLocation         = glGetUniformLocation(shaderProgram.program, "time");
+    // material
+    shaderProgram.ambientLocation      = glGetUniformLocation(shaderProgram.program, "material.ambient");
+    shaderProgram.diffuseLocation      = glGetUniformLocation(shaderProgram.program, "material.diffuse");
+    shaderProgram.specularLocation     = glGetUniformLocation(shaderProgram.program, "material.specular");
+    shaderProgram.shininessLocation    = glGetUniformLocation(shaderProgram.program, "material.shininess");
+    // texture
+    shaderProgram.texSamplerLocation   = glGetUniformLocation(shaderProgram.program, "texSampler");
+    shaderProgram.useTextureLocation   = glGetUniformLocation(shaderProgram.program, "material.useTexture");
+    // reflector
+    shaderProgram.reflectorPositionLocation  = glGetUniformLocation(shaderProgram.program, "reflectorPosition");
+    shaderProgram.reflectorDirectionLocation = glGetUniformLocation(shaderProgram.program, "reflectorDirection");
+  }
+  else {
     // load and compile simple shader (colors only, no lights at all)
 
     // push vertex shader and fragment shader
@@ -155,6 +265,7 @@ void initializeShaderPrograms(void) {
     // get uniforms locations
     shaderProgram.PVMmatrixLocation    = glGetUniformLocation(shaderProgram.program, "PVMmatrix");
 
+  }
 }
 
 /** Load mesh using assimp library
@@ -243,6 +354,39 @@ bool loadSingleMesh(const std::string &fileName, SCommonShaderProgram& shader, M
   mat->Get(AI_MATKEY_NAME, name); // may be "" after the input mesh processing. Must be aiString type!
 
   mat->Get<aiColor3D>(AI_MATKEY_COLOR_DIFFUSE, color);
+  (*geometry)->diffuse = glm::vec3(color.r, color.g, color.b);
+
+  // mat->Get(AI_MATKEY_COLOR_AMBIENT, color);
+  mat->Get<aiColor3D>(AI_MATKEY_COLOR_AMBIENT, color);
+  (*geometry)->ambient = glm::vec3(color.r, color.g, color.b);
+
+  mat->Get<aiColor3D>(AI_MATKEY_COLOR_SPECULAR, color);
+  (*geometry)->specular = glm::vec3(color.r, color.g, color.b);
+
+  float shininess;
+
+  mat->Get<float>(AI_MATKEY_SHININESS, shininess);
+  (*geometry)->shininess = shininess / 4.0f;  // shininess divisor-not descibed anywhere
+
+  (*geometry)->texture = 0;
+
+  // load texture image
+  if (mat->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
+    // get texture name 
+    mat->Get<aiString>(AI_MATKEY_TEXTURE(aiTextureType_DIFFUSE, 0) , name);
+    std::string textureName = name.data;
+
+    size_t found = fileName.find_last_of("/\\");
+    // insert correct texture file path 
+    if(found != std::string::npos) { // not found
+      //subMesh_p->textureName.insert(0, "/");
+      textureName.insert(0, fileName.substr(0, found+1));
+    }
+
+    std::cout << "Loading texture file: " << textureName << std::endl;
+    (*geometry)->texture = pgr::createTexture(textureName);
+  }
+  CHECK_GL_ERROR();
 
   glGenVertexArrays(1, &((*geometry)->vertexArrayObject));
   glBindVertexArray((*geometry)->vertexArrayObject);
@@ -253,10 +397,19 @@ bool loadSingleMesh(const std::string &fileName, SCommonShaderProgram& shader, M
   glEnableVertexAttribArray(shader.posLocation);
   glVertexAttribPointer(shader.posLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
+  if(useLighting == true) {
+    glEnableVertexAttribArray(shader.normalLocation);
+    glVertexAttribPointer(shader.normalLocation, 3, GL_FLOAT, GL_FALSE, 0, (void*)(3 * sizeof(float) * mesh->mNumVertices));
+  }
+  else {
 	glDisableVertexAttribArray(shader.colorLocation);
 	// following line is problematic on AMD/ATI graphic cards
 	// -> if you see black screen (no objects at all) than try to set color manually in vertex shader to see at least something
     glVertexAttrib3f(shader.colorLocation, color.r, color.g, color.b);
+  }
+
+  glEnableVertexAttribArray(shader.texCoordLocation);
+  glVertexAttribPointer(shader.texCoordLocation, 2, GL_FLOAT, GL_FALSE, 0, (void*)(6 * sizeof(float) * mesh->mNumVertices));
   CHECK_GL_ERROR();
 
   glBindVertexArray(0);
@@ -282,9 +435,22 @@ void initMissileGeometry(SCommonShaderProgram &shader, MeshGeometry **geometry) 
   // vertices of triangles - start at the beginning of the array
   glVertexAttribPointer(shader.posLocation, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
+  if(useLighting == false) {
     glEnableVertexAttribArray(shader.colorLocation);
     // colors of vertices start after the positions
     glVertexAttribPointer(shader.colorLocation, 3, GL_FLOAT, GL_FALSE, 0, (void*)(missileTrianglesCount * 3 * 3 * sizeof(float)));
+  }
+  else {
+    glEnableVertexAttribArray(shader.normalLocation);
+    // normals of vertices start after the colors
+    glVertexAttribPointer(shader.normalLocation, 3, GL_FLOAT, GL_FALSE, 0, (void*)(2 * missileTrianglesCount * 3 * 3 * sizeof(float)));
+  }
+
+  (*geometry)->ambient = glm::vec3(0.0f, 1.0f, 1.0f);
+  (*geometry)->diffuse = glm::vec3(0.0f, 1.0f, 1.0f);
+  (*geometry)->specular = glm::vec3(0.0f, 1.0f, 1.0f);
+  (*geometry)->shininess = 10.0f;
+  (*geometry)->texture = 0;
 
   glBindVertexArray(0);
 
@@ -311,9 +477,22 @@ void initUfoGeometry(SCommonShaderProgram &shader, MeshGeometry **geometry) {
   // vertices of triangles - start at the beginning of the array
   glVertexAttribPointer(shader.posLocation, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), 0);
 
+  if(useLighting == false) {
     glEnableVertexAttribArray(shader.colorLocation);
     // color of vertex starts after the position (interlaced arrays)
     glVertexAttribPointer(shader.colorLocation, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
+  }
+  else {
+    glEnableVertexAttribArray(shader.normalLocation);
+    // normal of vertex starts after the color (interlaced array)
+    glVertexAttribPointer(shader.normalLocation, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(6 * sizeof(float)));
+  }
+
+  (*geometry)->ambient = glm::vec3(1.0f, 0.0f, 1.0f);
+  (*geometry)->diffuse = glm::vec3(1.0f, 0.0f, 1.0f);
+  (*geometry)->specular = glm::vec3(1.0f, 0.0f, 1.0f);
+  (*geometry)->shininess = 10.0f;
+  (*geometry)->texture = 0;
 
   glBindVertexArray(0);
 
@@ -351,6 +530,8 @@ void cleanupGeometry(MeshGeometry *geometry) {
   glDeleteBuffers(1, &(geometry->elementBufferObject));
   glDeleteBuffers(1, &(geometry->vertexBufferObject));
 
+  if(geometry->texture != 0)
+    glDeleteTextures(1, &(geometry->texture));
 }
 
 void cleanupModels() {
